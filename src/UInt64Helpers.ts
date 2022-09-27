@@ -20,3 +20,7 @@ export const subDays = (timestamp: UInt64, days: number): UInt64 => {
       return timestamp.sub(oneDay);
     }, timestamp);
 };
+
+export const assertNotZero = (amount: UInt64) => {
+  amount.assertGt(UInt64.fromNumber(0));
+};

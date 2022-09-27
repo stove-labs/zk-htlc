@@ -1,17 +1,22 @@
 import { AccountUpdate, Mina, PrivateKey } from 'snarkyjs';
-import { HTLCPoseidon } from './HTLCPoseidon';
+import { HTLCPoseidonNative } from './HTLCPoseidonNative';
 
 export const setupLocalMinaBlockchain = () => {
-  console.log('setting up local blockchain');
   const localInstance = Mina.LocalBlockchain();
   Mina.setActiveInstance(localInstance);
   const feePayer = localInstance.testAccounts[0].privateKey;
   return { feePayer };
 };
 
+// just for the info
+export const feePayerInitialBalance = 30000000000;
+export const contractInitialBalance = 1000;
 export const deploy = async (feePayer: PrivateKey) => {
   const zkAppPrivateKey = PrivateKey.random();
-  const contractInstance = new HTLCPoseidon(zkAppPrivateKey.toPublicKey());
+  const contractInstance = new HTLCPoseidonNative(
+    zkAppPrivateKey.toPublicKey()
+  );
+
   // forge a deployment transaction
   const tx = await Mina.transaction(feePayer, () => {
     // fund the fee payer account
