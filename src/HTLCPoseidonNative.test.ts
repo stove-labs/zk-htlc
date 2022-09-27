@@ -74,7 +74,6 @@ describe('HTLCPoseidonNative', () => {
     });
   });
 
-  // TODO: fix account update issues
   describe('unlock', () => {
     it('should unlock locked funds', async () => {
       const vars = variables();
@@ -92,7 +91,6 @@ describe('HTLCPoseidonNative', () => {
 
       fundRecipientTx.send();
 
-      // TODO: figure out why this fails with `Invalid_fee_excess`
       const tx = await Mina.transaction(feePayer, () => {
         contractInstance.unlock(vars.secret);
         // sign to satisfy permission proofOrSignature
@@ -101,7 +99,6 @@ describe('HTLCPoseidonNative', () => {
 
       tx.send();
 
-      // TODO: assert
       const recipientBalance = Mina.getBalance(vars.recipient.toPublicKey());
       recipientBalance.assertEquals(vars.amount);
 
