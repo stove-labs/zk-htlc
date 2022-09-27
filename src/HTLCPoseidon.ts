@@ -163,6 +163,7 @@ export abstract class HTLCPoseidon
   @method
   unlock(secret: Secret) {
     // verify preconditions
+    // TODO: actually check the state, not just the nonce
     this.assertIsSecondTransaction();
     this.assertSecretHashEqualsHashlock(secret);
 
