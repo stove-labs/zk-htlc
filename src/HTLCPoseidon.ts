@@ -33,6 +33,7 @@ export class Secret extends CircuitValue {
   }
 }
 
+// TODO: remove Recipient in favour of plain PublicKey
 export class Recipient extends CircuitValue {
   @prop value: Group;
 
