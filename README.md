@@ -1,4 +1,4 @@
-# Mina zkApp: Zk Bridge
+# Mina zkApp: ZK-HTLC
 
 This template uses TypeScript.
 
