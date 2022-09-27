@@ -1,3 +1,2 @@
-import { Add } from './Add.js';
-
-export { Add };
+import { HTLCPoseidon } from './HTLCPoseidon';
+export { HTLCPoseidon };
