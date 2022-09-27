@@ -11,6 +11,8 @@ import { Recipient, Secret } from './HTLCPoseidon';
 import { HTLCPoseidonNative } from './HTLCPoseidonNative';
 import { addDays } from './UInt64Helpers';
 
+const recipientPublicKey = PrivateKey.random().toPublicKey();
+
 describe('HTLCPoseidonNative', () => {
   let feePayer: PrivateKey;
   let contractInstance: HTLCPoseidonNative;
@@ -36,9 +38,7 @@ describe('HTLCPoseidonNative', () => {
     const timestamp = Mina.getNetworkState().timestamp;
     const expireAt = addDays(timestamp, 4);
     const amount = UInt64.fromNumber(300000000);
-    const recipient = Recipient.fromPublicKey(
-      PrivateKey.random().toPublicKey()
-    );
+    const recipient = Recipient.fromPublicKey(recipientPublicKey);
 
     return { secret, hashlock, timestamp, expireAt, amount, recipient };
   };
@@ -83,8 +83,10 @@ describe('HTLCPoseidonNative', () => {
         const accountUpdate = AccountUpdate.createSigned(feePayer);
         accountUpdate.send({
           to: vars.recipient.toPublicKey(),
-          amount: 1000000000,
+          // send 0 to the recipient
+          amount: 0,
         });
+        // subtract account creation fee from the feePayer
         accountUpdate.balance.subInPlace(1000000000);
       });
 
@@ -100,6 +102,11 @@ describe('HTLCPoseidonNative', () => {
       tx.send();
 
       // TODO: assert
+      const recipientBalance = Mina.getBalance(vars.recipient.toPublicKey());
+      recipientBalance.assertEquals(vars.amount);
+
+      const contractBalance = Mina.getBalance(zkAppPrivateKey.toPublicKey());
+      contractBalance.assertEquals(UInt64.fromNumber(0));
     });
   });
 });
