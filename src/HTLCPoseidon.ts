@@ -16,7 +16,9 @@ import {
 import { assertNotZero, subDays } from './UInt64Helpers';
 
 /**
- *  Single Field secret can fit 4x UInt64, since it can store 256bits
+ * Single Field secret can fit 4x UInt64, since it can store 256bits
+ * TODO: wrap secret verification and reveal in a separate contract/proof
+ * in order to workaround the contract storage limits
  */
 export class Secret extends CircuitValue {
   @arrayProp(Field, 1) value: Field[];
