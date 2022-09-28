@@ -20,7 +20,7 @@
     "prepare": "husky install",
     "test": "node --experimental-vm-modules --experimental-wasm-modules --experimental-wasm-threads node_modules/.bin/jest",
     "testw": "node --experimental-vm-modules --experimental-wasm-modules --experimental-wasm-threads node_modules/.bin/jest --watch",
-    "lint": "npx eslint src/* --fix"
+    "lint": "eslint src/* --fix"
   },
   "lint-staged": {
     "**/*": [
@@ -34,7 +34,7 @@
     "@types/jest": "^27.0.3",
     "@typescript-eslint/eslint-plugin": "^5.5.0",
     "@typescript-eslint/parser": "^5.5.0",
-    "eslint": "^8.7.0",
+    "eslint": "^8.24.0",
     "eslint-plugin-snarkyjs": "^0.1.0",
     "husky": "^7.0.1",
     "jest": "^27.3.1",
