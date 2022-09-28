@@ -1,5 +1,5 @@
-import { UInt64 } from 'snarkyjs';
-import { HTLCPoseidon, HTLCPoseidonConcrete, Recipient } from './HTLCPoseidon';
+import { PublicKey, UInt64 } from 'snarkyjs';
+import { HTLCPoseidon, HTLCPoseidonConcrete } from './HTLCPoseidon';
 
 export class HTLCPoseidonNative
   extends HTLCPoseidon
@@ -9,13 +9,13 @@ export class HTLCPoseidonNative
     this.balance.addInPlace(amount);
   }
 
-  withdrawFromSelfToRecipient(recipient: Recipient) {
+  withdrawFromSelfTo(address: PublicKey) {
     const currentBalance = this.account.balance.get();
     // assert balance is equal at time of execution
     this.account.balance.assertEquals(currentBalance);
     // empty out the contract completely
     this.send({
-      to: recipient.toPublicKey(),
+      to: address,
       amount: currentBalance,
     });
   }

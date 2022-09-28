@@ -3,11 +3,9 @@ import {
   CircuitValue,
   DeployArgs,
   Field,
-  Group,
   method,
   Permissions,
   Poseidon,
-  prop,
   PublicKey,
   SmartContract,
   state,
@@ -33,27 +31,11 @@ export class Secret extends CircuitValue {
   }
 }
 
-// TODO: remove Recipient in favour of plain PublicKey
-export class Recipient extends CircuitValue {
-  @prop value: Group;
-
-  static fromPublicKey(publicKey: PublicKey): Recipient {
-    const recipient = new Recipient();
-    // this will always be two fields;
-    recipient.value = publicKey.toGroup();
-    return recipient;
-  }
-
-  toPublicKey(): PublicKey {
-    return PublicKey.fromGroup(this.value);
-  }
-}
-
 export interface HTLCPoseidonConcrete {
   // eslint-disable-next-line
   depositIntoSelf(amount: UInt64): void;
   // eslint-disable-next-line
-  withdrawFromSelfToRecipient(recipient: Recipient): void;
+  withdrawFromSelfTo(address: PublicKey): void;
 }
 
 /**
@@ -64,8 +46,12 @@ export abstract class HTLCPoseidon
   implements HTLCPoseidonConcrete
 {
   // 2 fields
-  @state(Recipient)
-  recipient: State<Recipient> = State<Recipient>();
+  @state(PublicKey)
+  refundTo: State<PublicKey> = State<PublicKey>();
+
+  // 2 fields
+  @state(PublicKey)
+  recipient: State<PublicKey> = State<PublicKey>();
   // 1 field
   @state(Field)
   hashlock: State<Field> = State<Field>();
@@ -111,12 +97,38 @@ export abstract class HTLCPoseidon
     assertNotZero(amount);
   }
 
+  assertIsExpired() {
+    const timestamp = this.network.timestamp.get();
+    this.network.timestamp.assertEquals(timestamp);
+    const expireAt = this.expireAt.get();
+    this.expireAt.assertEquals(expireAt);
+
+    // TODO: should we use assertLt instead?
+    expireAt.assertLte(timestamp);
+  }
+
+  getRecipient() {
+    const recipient = this.recipient.get();
+    this.recipient.assertEquals(recipient);
+    return recipient;
+  }
+
+  getRefundTo() {
+    const refundTo = this.refundTo.get();
+    this.refundTo.assertEquals(refundTo);
+    return refundTo;
+  }
+
   setHashLock(hashlock: Field) {
     this.hashlock.set(hashlock);
   }
 
-  setRecipient(recipient: Recipient) {
+  setRecipient(recipient: PublicKey) {
     this.recipient.set(recipient);
+  }
+
+  setRefundTo(refundTo: PublicKey) {
+    this.refundTo.set(refundTo);
   }
 
   assertSecretHashEqualsHashlock(secret: Secret) {
@@ -134,7 +146,8 @@ export abstract class HTLCPoseidon
 
   @method
   lock(
-    recipient: Recipient,
+    refundTo: PublicKey,
+    recipient: PublicKey,
     amount: UInt64,
     hashlock: Field,
     expireAt: UInt64
@@ -145,6 +158,7 @@ export abstract class HTLCPoseidon
     this.assertDepositAmountNotZero(amount);
 
     // update state
+    this.setRefundTo(refundTo);
     this.setRecipient(recipient);
     this.setHashLock(hashlock);
 
@@ -153,13 +167,7 @@ export abstract class HTLCPoseidon
   }
 
   // eslint-disable-next-line
-  abstract withdrawFromSelfToRecipient(recipient: Recipient): void;
-
-  getRecipient() {
-    const recipient = this.recipient.get();
-    this.recipient.assertEquals(recipient);
-    return recipient;
-  }
+  abstract withdrawFromSelfTo(address: PublicKey): void;
 
   @method
   unlock(secret: Secret) {
@@ -170,11 +178,16 @@ export abstract class HTLCPoseidon
 
     const recipient = this.getRecipient();
     // transfer from the contract to the recipient
-    this.withdrawFromSelfToRecipient(recipient);
+    this.withdrawFromSelfTo(recipient);
   }
 
   @method
-  refund() {}
+  refund() {
+    this.assertIsExpired();
+
+    const refundTo = this.getRefundTo();
+    this.withdrawFromSelfTo(refundTo);
+  }
 
   deploy(args: DeployArgs) {
     super.deploy(args);
