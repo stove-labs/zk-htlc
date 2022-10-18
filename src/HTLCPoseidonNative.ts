@@ -5,7 +5,7 @@ export class HTLCPoseidonNative
   extends HTLCPoseidon
   implements HTLCPoseidonConcrete
 {
-  depositIntoSelf(amount: UInt64) {
+  depositIntoSelf(from: PublicKey, amount: UInt64) {
     this.balance.addInPlace(amount);
   }
 
