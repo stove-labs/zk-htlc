@@ -35,7 +35,7 @@ export class Secret extends CircuitValue {
 
 export interface HTLCPoseidonConcrete {
   // eslint-disable-next-line
-  depositIntoSelf(amount: UInt64): void;
+  depositIntoSelf(from: PublicKey, amount: UInt64): void;
   // eslint-disable-next-line
   withdrawFromSelfTo(address: PublicKey): void;
 }
@@ -64,6 +64,8 @@ export abstract class HTLCPoseidon
   /**
    * Expose secret through the storage, as it needs to be visible to the
    * second party in case the HTLC is used for an atomic swap.
+   *
+   * // TODO: replace with 'releasing' the secret via events, to free up contract on-chain storage
    *
    * IMPORTANT: This only happens at release time, never at lock time.
    */
@@ -144,7 +146,7 @@ export abstract class HTLCPoseidon
   }
 
   // eslint-disable-next-line
-  abstract depositIntoSelf(amount: UInt64): void;
+  abstract depositIntoSelf(from: PublicKey, amount: UInt64): void;
 
   @method
   lock(
@@ -165,7 +167,7 @@ export abstract class HTLCPoseidon
     this.setHashLock(hashlock);
 
     // transfer from someone to the contract
-    this.depositIntoSelf(amount);
+    this.depositIntoSelf(refundTo, amount);
   }
 
   // eslint-disable-next-line

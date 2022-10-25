@@ -31,7 +31,7 @@ function balanceSum(accountUpdate: AccountUpdate, tokenId: Field) {
 
 export class TokenContract extends SmartContract {
   // constant supply
-  SUPPLY = UInt64.from(10n ** 18n);
+  SUPPLY = UInt64.from(Mina.accountCreationFee().mul(10));
 
   deploy(args?: DeployArgs) {
     super.deploy(args);
@@ -48,7 +48,7 @@ export class TokenContract extends SmartContract {
       amount: this.SUPPLY,
     });
     // assert that the receiving account is new, so this can be only done once
-    receiver.account.isNew.assertEquals(Bool(true));
+    // receiver.account.isNew.assertEquals(Bool(true));
     // pay fees for opened account
     this.balance.subInPlace(Mina.accountCreationFee());
   }
@@ -71,19 +71,19 @@ export class TokenContract extends SmartContract {
     zkapp.sign();
   }
 
-  // let a zkapp do whatever it wants, as long as the token supply stays constant
-  @method authorize(callback: Experimental.Callback<any>) {
-    let layout = [[3, 0, 0], 0, 0]; // these are 10 child account updates we allow, in a left-biased tree of width 3
-    // TODO: this should also return what the callback returns, and authorize should pass it on!
-    let zkappUpdate = Experimental.accountUpdateFromCallback(
-      this,
-      layout,
-      callback
-    );
-    // walk account updates to see if balances for this token cancel
-    let balance = balanceSum(zkappUpdate, this.experimental.token.id);
-    balance.assertEquals(Int64.zero);
-  }
+  // // let a zkapp do whatever it wants, as long as the token supply stays constant
+  // @method authorize(callback: Experimental.Callback<any>) {
+  //   let layout = [[3, 0, 0], 0, 0]; // these are 10 child account updates we allow, in a left-biased tree of width 3
+  //   // TODO: this should also return what the callback returns, and authorize should pass it on!
+  //   let zkappUpdate = Experimental.accountUpdateFromCallback(
+  //     this,
+  //     layout,
+  //     callback
+  //   );
+  //   // walk account updates to see if balances for this token cancel
+  //   let balance = balanceSum(zkappUpdate, this.experimental.token.id);
+  //   balance.assertEquals(Int64.zero);
+  // }
 
   @method transfer(from: PublicKey, to: PublicKey, value: UInt64) {
     this.experimental.token.send({ from, to, amount: value });

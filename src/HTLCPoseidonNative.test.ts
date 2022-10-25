@@ -25,7 +25,7 @@ export interface TestContext {
   zkAppPrivateKey: PrivateKey;
 }
 
-describe.only('HTLCPoseidonNative', () => {
+describe.skip('HTLCPoseidonNative', () => {
   let context = {} as TestContext;
 
   // beforeAll since the tests are consequtive
