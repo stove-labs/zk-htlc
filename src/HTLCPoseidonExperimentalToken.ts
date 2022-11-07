@@ -15,6 +15,7 @@ export class HTLCPoseidonExperimentalToken
     );
 
     fromAccountUpdate.balance.subInPlace(amount);
+    return fromAccountUpdate;
   }
 
   withdrawFromSelfTo(address: PublicKey) {

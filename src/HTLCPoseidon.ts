@@ -1,4 +1,5 @@
 import {
+  AccountUpdate,
   arrayProp,
   CircuitValue,
   DeployArgs,
@@ -10,7 +11,6 @@ import {
   SmartContract,
   state,
   State,
-  UInt32,
   UInt64,
 } from 'snarkyjs';
 import { assertNotZero, subDays } from './UInt64Helpers';
@@ -35,7 +35,7 @@ export class Secret extends CircuitValue {
 
 export interface HTLCPoseidonConcrete {
   // eslint-disable-next-line
-  depositIntoSelf(from: PublicKey, amount: UInt64): void;
+  depositIntoSelf(from: PublicKey, amount: UInt64): AccountUpdate;
   // eslint-disable-next-line
   withdrawFromSelfTo(address: PublicKey): void;
 }
@@ -72,20 +72,6 @@ export abstract class HTLCPoseidon
   @state(Secret)
   secret: State<Secret> = State<Secret>();
 
-  assertIsFirstTransaction() {
-    const nonce = this.account.nonce.get();
-    this.account.nonce.assertEquals(nonce);
-    // check if this is the first transaction that happened to the contract
-    nonce.assertEquals(UInt32.fromNumber(1));
-  }
-
-  assertIsSecondTransaction() {
-    const nonce = this.account.nonce.get();
-    this.account.nonce.assertEquals(nonce);
-    // check if this is the second transaction that happened to the contract
-    nonce.assertEquals(UInt32.fromNumber(2));
-  }
-
   assertExpiresAtSufficientFuture(expireAt: UInt64) {
     const timestamp = this.network.timestamp.get();
     this.network.timestamp.assertEquals(timestamp);
@@ -99,6 +85,20 @@ export abstract class HTLCPoseidon
 
   assertDepositAmountNotZero(amount: UInt64) {
     assertNotZero(amount);
+  }
+
+  assertIsNew() {
+    const recipient = this.recipient.get();
+    this.recipient.assertEquals(recipient);
+    // there is no recipient yet
+    recipient.isEmpty().assertTrue();
+  }
+
+  assertIsNotNew() {
+    const recipient = this.recipient.get();
+    this.recipient.assertEquals(recipient);
+    // there is no recipient yet
+    recipient.isEmpty().assertFalse();
   }
 
   assertIsExpired() {
@@ -135,6 +135,10 @@ export abstract class HTLCPoseidon
     this.refundTo.set(refundTo);
   }
 
+  setSecret(secret: Secret) {
+    this.secret.set(secret);
+  }
+
   assertSecretHashEqualsHashlock(secret: Secret) {
     // check if the secret results into an identical hash
     const currentHashlock = this.hashlock.get();
@@ -146,7 +150,7 @@ export abstract class HTLCPoseidon
   }
 
   // eslint-disable-next-line
-  abstract depositIntoSelf(from: PublicKey, amount: UInt64): void;
+  abstract depositIntoSelf(from: PublicKey, amount: UInt64): AccountUpdate;
 
   @method
   lock(
@@ -155,19 +159,17 @@ export abstract class HTLCPoseidon
     amount: UInt64,
     hashlock: Field,
     expireAt: UInt64
-  ) {
+  ): AccountUpdate {
     // verify preconditions
-    this.assertIsFirstTransaction();
+    this.assertIsNew();
     this.assertExpiresAtSufficientFuture(expireAt);
     this.assertDepositAmountNotZero(amount);
-
     // update state
     this.setRefundTo(refundTo);
     this.setRecipient(recipient);
     this.setHashLock(hashlock);
-
     // transfer from someone to the contract
-    this.depositIntoSelf(refundTo, amount);
+    return this.depositIntoSelf(refundTo, amount);
   }
 
   // eslint-disable-next-line
@@ -177,8 +179,10 @@ export abstract class HTLCPoseidon
   unlock(secret: Secret) {
     // verify preconditions
     // TODO: actually check the state, not just the nonce
-    this.assertIsSecondTransaction();
+    this.assertIsNotNew();
     this.assertSecretHashEqualsHashlock(secret);
+
+    this.setSecret(secret);
 
     const recipient = this.getRecipient();
     // transfer from the contract to the recipient
@@ -202,6 +206,7 @@ export abstract class HTLCPoseidon
       // TODO: allow only proofs in production
       // for testing purposes, allow tx signed with the app's private key to update state
       editState: Permissions.proofOrSignature(),
+      send: Permissions.proofOrSignature(),
     });
   }
 }

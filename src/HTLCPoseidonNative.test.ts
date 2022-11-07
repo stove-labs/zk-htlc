@@ -1,11 +1,4 @@
-import {
-  AccountUpdate,
-  isReady,
-  Mina,
-  Poseidon,
-  PrivateKey,
-  UInt64,
-} from 'snarkyjs';
+import { isReady, Mina, Poseidon, PrivateKey, UInt64 } from 'snarkyjs';
 import {
   deploy,
   fundAddress,
@@ -25,7 +18,7 @@ export interface TestContext {
   zkAppPrivateKey: PrivateKey;
 }
 
-describe.skip('HTLCPoseidonNative', () => {
+describe.only('HTLCPoseidonNative', () => {
   let context = {} as TestContext;
 
   // beforeAll since the tests are consequtive
@@ -66,46 +59,58 @@ describe.skip('HTLCPoseidonNative', () => {
     await transferTo(context.feePayer, vars.refundTo, vars.amount);
 
     const tx = await Mina.transaction(context.feePayer, () => {
-      const accountUpdate = AccountUpdate.createSigned(refundToPrivateKey);
-      accountUpdate.balance.subInPlace(vars.amount);
-      context.contractInstance.lock(
+      // refundTo needs to sign so the contract can transfer funds on its behalf
+      const sendFromRefundToAccountUpdate = context.contractInstance.lock(
         vars.refundTo,
         vars.recipient,
         vars.amount,
         vars.hashlock,
         vars.expireAt
       );
-      // sign to satisfy permission proofOrSignature
-      context.contractInstance.sign(context.zkAppPrivateKey);
+
+      sendFromRefundToAccountUpdate.sign(refundToPrivateKey);
     });
 
-    // TODO: .wait() triggers 'Invalid_fee_excess'
-    tx.send();
+    await tx.prove();
+    const id = await tx.send();
+    // wait for the tx to make it into a block, since we rely on nonces in subsequent transactions
+    await id.wait();
+    console.log(
+      'after lock',
+      context.contractInstance.account.nonce.get().toString()
+    );
   };
 
-  const unlock = async (secret: Secret) => {
+  const unlock = async (vars: ReturnType<typeof variables>) => {
+    console.log(
+      'before unlock',
+      context.contractInstance.account.nonce.get().toString()
+    );
     const tx = await Mina.transaction(context.feePayer, () => {
-      context.contractInstance.unlock(secret);
-      // sign to satisfy permission proofOrSignature
-      context.contractInstance.sign(context.zkAppPrivateKey);
+      context.contractInstance.unlock(vars.secret);
     });
 
-    tx.send();
+    await tx.prove();
+    await tx.send();
   };
 
   const refund = async () => {
     const tx = await Mina.transaction(context.feePayer, () => {
       context.contractInstance.refund();
-      // sign to satisfy permission proofOrSignature
-      context.contractInstance.sign(context.zkAppPrivateKey);
     });
 
-    tx.send();
+    await tx.prove();
+    await tx.send();
   };
 
   describe('lock', () => {
     it('should create a lock', async () => {
       const vars = variables();
+
+      console.log(
+        'before lock',
+        context.contractInstance.account.nonce.get().toString()
+      );
 
       await lock(vars);
 
@@ -134,7 +139,16 @@ describe.skip('HTLCPoseidonNative', () => {
 
         await fundAddress(context.feePayer, vars.recipient);
 
-        await unlock(vars.secret);
+        console.log(
+          'account ready',
+          Mina.getBalance(vars.recipient).toString()
+        );
+
+        console.log(
+          'before unlock',
+          context.contractInstance.account.nonce.get().toString()
+        );
+        await unlock(vars);
 
         const recipientBalance = Mina.getBalance(vars.recipient);
         recipientBalance.assertEquals(vars.amount);
@@ -152,8 +166,8 @@ describe.skip('HTLCPoseidonNative', () => {
 
         await refund();
 
-        const recipientBalance = Mina.getBalance(vars.refundTo);
-        recipientBalance.assertEquals(vars.amount);
+        const refundToBalance = Mina.getBalance(vars.refundTo);
+        refundToBalance.assertEquals(vars.amount);
 
         const contractBalance = Mina.getBalance(
           context.zkAppPrivateKey.toPublicKey()

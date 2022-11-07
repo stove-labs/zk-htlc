@@ -47,7 +47,7 @@ export const deploy = async (
     contractInstance.sign(zkAppPrivateKey);
   });
 
-  tx.send();
+  await tx.send();
 
   console.log('contract deployed');
 
@@ -67,7 +67,9 @@ export const fundAddress = async (feePayer: PrivateKey, address: PublicKey) => {
     accountUpdate.balance.subInPlace(Mina.accountCreationFee());
   });
 
-  fundRecipientTx.send();
+  await fundRecipientTx.prove();
+
+  await fundRecipientTx.send();
 };
 
 export const transferTo = async (
@@ -89,7 +91,10 @@ export const transferTo = async (
     });
   });
 
-  transferToTx.send();
+  await transferToTx.prove();
+
+  await transferToTx.send();
+  console.log('transferTo', 'done');
 };
 
 export const transferTokenTo = async (
@@ -119,7 +124,7 @@ export const transferTokenTo = async (
 
   transferToTx.sign([from]);
 
-  transferToTx.send();
+  await transferToTx.send();
   console.log('transferTokenTo successful');
 };
 
@@ -140,7 +145,9 @@ export const deployToken = async (feePayer: PrivateKey) => {
     contractInstance.sign(zkAppPrivateKey);
   });
 
-  deployTx.send();
+  // await deployTx.prove();
+
+  await deployTx.send();
 
   /**
    * Token contract needs to hold MINA, in order to pay the creation fee
@@ -158,14 +165,16 @@ export const deployToken = async (feePayer: PrivateKey) => {
     // init the contract
     contractInstance.init();
     // sign it, since we are not using proofs
-    // contractInstance.sign(zkAppPrivateKey);
+    contractInstance.sign(zkAppPrivateKey);
   });
 
-  initTx.prove();
+  // initTx.sign([])
 
-  console.log('tx', initTx.toPretty());
+  // await initTx.prove();
 
-  initTx.send();
+  // console.log('tx', initTx.toPretty());
+
+  await initTx.send();
 
   console.log(
     'token contract deployed with balances',

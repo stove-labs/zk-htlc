@@ -4,6 +4,7 @@ import {
   deployToken,
   fundAddress,
   setupLocalMinaBlockchain,
+  transferTo,
   transferTokenTo,
 } from './helpers';
 import { HTLCPoseidon, Secret } from './HTLCPoseidon';
@@ -24,7 +25,7 @@ export interface TestContext {
   };
 }
 
-describe.only('HTLCPoseidonExperimentalToken', () => {
+describe.skip('HTLCPoseidonExperimentalToken', () => {
   let context = {} as TestContext;
 
   // we need to wrap it into a function like this due to await isReady
@@ -59,7 +60,8 @@ describe.only('HTLCPoseidonExperimentalToken', () => {
       ...(await deploy(
         context.feePayer,
         HTLCPoseidonExperimentalToken,
-        context.token.contractInstance.experimental.token.id
+        // context.token.contractInstance.experimental.token.id
+        context.token.contractInstance.tokenId
       )),
     };
   });
@@ -109,11 +111,17 @@ describe.only('HTLCPoseidonExperimentalToken', () => {
 
       // fund 'refundTo', so that it can receive
       await fundAddress(context.feePayer, vars.refundTo);
-      // await transferTo(
-      //   context.feePayer,
-      //   vars.refundTo,
-      //   Mina.accountCreationFee().mul(5)
-      // );
+      await transferTo(
+        context.feePayer,
+        context.zkAppPrivateKey.toPublicKey(),
+        Mina.accountCreationFee().mul(5)
+      );
+
+      await transferTo(
+        context.feePayer,
+        vars.refundTo,
+        Mina.accountCreationFee().mul(5)
+      );
 
       // await transferTo(
       //   context.feePayer,
