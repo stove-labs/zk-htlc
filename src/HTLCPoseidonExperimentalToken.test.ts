@@ -1,4 +1,11 @@
-import { isReady, Mina, Poseidon, PrivateKey, UInt64 } from 'snarkyjs';
+import {
+  Experimental,
+  isReady,
+  Mina,
+  Poseidon,
+  PrivateKey,
+  UInt64,
+} from 'snarkyjs';
 import {
   deploy,
   deployToken,
@@ -25,7 +32,7 @@ export interface TestContext {
   };
 }
 
-describe.skip('HTLCPoseidonExperimentalToken', () => {
+describe('HTLCPoseidonExperimentalToken', () => {
   let context = {} as TestContext;
 
   // we need to wrap it into a function like this due to await isReady
@@ -36,7 +43,7 @@ describe.skip('HTLCPoseidonExperimentalToken', () => {
     const hashlock = Poseidon.hash(secret.value);
     const timestamp = Mina.getNetworkState().timestamp;
     const expireAt = addDays(timestamp, 4);
-    const amount = UInt64.fromNumber(300000000);
+    const amount = UInt64.from(300000000);
     const recipient = recipientPrivateKey.toPublicKey();
     const refundTo = refundToPrivateKey.toPublicKey();
     return {
@@ -60,189 +67,241 @@ describe.skip('HTLCPoseidonExperimentalToken', () => {
       ...(await deploy(
         context.feePayer,
         HTLCPoseidonExperimentalToken,
-        // context.token.contractInstance.experimental.token.id
-        context.token.contractInstance.tokenId
+        context.token.contractInstance,
+        context.token.contractInstance.experimental.token.id
       )),
     };
+
+    (
+      context.contractInstance as HTLCPoseidonExperimentalToken
+    ).tokenContractAddress = context.token.contractInstance.address;
   });
 
   const lock = async (vars: ReturnType<typeof variables>) => {
+    // fund 'refundTo', so that it can receive tokens
+    await fundAddress(context.feePayer, vars.refundTo);
+
+    // send a creation fee amount fo refundTo, so it can pay for the contract's token account creation
+    await transferTo(
+      context.feePayer,
+      vars.refundTo,
+      Mina.accountCreationFee().mul(1)
+    );
+
+    // fund the lock creator account with custom tokens
+    await transferTokenTo(
+      context.token.contractInstance,
+      context.zkAppPrivateKey,
+      context.feePayer,
+      context.token.zkAppPrivateKey,
+      vars.refundTo,
+      vars.amount,
+      true // fund
+    );
+
     console.log('locking');
     const tx = await Mina.transaction(context.feePayer, () => {
-      context.contractInstance.lock(
-        vars.refundTo,
-        vars.recipient,
-        vars.amount,
-        vars.hashlock,
-        vars.expireAt
+      const approvableCallback = Experimental.Callback.create(
+        context.contractInstance,
+        'lock',
+        [
+          vars.refundTo,
+          vars.recipient,
+          vars.amount,
+          vars.hashlock,
+          vars.expireAt,
+        ]
       );
-      // // sign to satisfy permission proofOrSignature
-      context.contractInstance.sign(context.zkAppPrivateKey);
+
+      context.token.contractInstance.approveTransferCallback(
+        approvableCallback
+      );
     });
-    // TODO CONTINUE HERE: figure out why:
-    //  [[],[],[["Update_not_permitted_balance"],["Overflow"]]]
+
     tx.sign([refundToPrivateKey]);
-    tx.send();
+
+    console.log('proving');
+    await tx.prove();
+
+    console.log('sending');
+    await tx.send();
   };
 
-  // const unlock = async (secret: Secret) => {
-  //   const tx = await Mina.transaction(context.feePayer, () => {
-  //     context.contractInstance.unlock(secret);
-  //     // sign to satisfy permission proofOrSignature
-  //     context.contractInstance.sign(context.zkAppPrivateKey);
-  //   });
+  const unlock = async (vars: ReturnType<typeof variables>) => {
+    // fund the recipient so it can receive mina
+    await fundAddress(context.feePayer, vars.recipient);
 
-  //   tx.send();
-  // };
+    await transferTokenTo(
+      context.token.contractInstance,
+      context.zkAppPrivateKey,
+      context.feePayer,
+      context.token.zkAppPrivateKey,
+      vars.recipient,
+      UInt64.from(0),
+      true // fund
+    );
 
-  // const refund = async () => {
-  //   const tx = await Mina.transaction(context.feePayer, () => {
-  //     context.contractInstance.refund();
-  //     // sign to satisfy permission proofOrSignature
-  //     context.contractInstance.sign(context.zkAppPrivateKey);
-  //   });
+    console.log('unlocking');
+    const tx = await Mina.transaction(context.feePayer, () => {
+      context.contractInstance.unlock(vars.secret);
+      context.token.contractInstance.approveUpdateAndSend(
+        context.contractInstance.self,
+        vars.recipient,
+        vars.amount
+      );
+    });
 
-  //   tx.send();
-  // };
+    tx.sign([recipientPrivateKey]);
+
+    console.log('unlock tx');
+    console.log(tx.toPretty());
+
+    await tx.prove();
+    await tx.send();
+  };
+
+  const refund = async (vars: ReturnType<typeof variables>) => {
+    await fundAddress(context.feePayer, vars.recipient);
+
+    await transferTokenTo(
+      context.token.contractInstance,
+      context.zkAppPrivateKey,
+      context.feePayer,
+      context.token.zkAppPrivateKey,
+      vars.recipient,
+      UInt64.from(0),
+      true // fund
+    );
+
+    const tx = await Mina.transaction(context.feePayer, () => {
+      context.contractInstance.refund();
+      context.token.contractInstance.approveUpdateAndSend(
+        context.contractInstance.self,
+        vars.refundTo,
+        vars.amount
+      );
+    });
+
+    await tx.prove();
+    await tx.send();
+  };
 
   describe('lock', () => {
     it('should create a lock', async () => {
       const vars = variables();
 
-      // fund 'refundTo', so that it can receive
-      await fundAddress(context.feePayer, vars.refundTo);
-      await transferTo(
-        context.feePayer,
+      const contractBalanceBefore = Mina.getBalance(
         context.zkAppPrivateKey.toPublicKey(),
-        Mina.accountCreationFee().mul(5)
+        context.token.contractInstance.experimental.token.id
       );
-
-      await transferTo(
-        context.feePayer,
-        vars.refundTo,
-        Mina.accountCreationFee().mul(5)
-      );
-
-      // await transferTo(
-      //   context.feePayer,
-      //   context.zkAppPrivateKey.toPublicKey(),
-      //   Mina.accountCreationFee().mul(5)
-      // );
-
-      console.log('balances refundTo', vars.refundTo.toBase58(), {
-        token: {
-          mina: Mina.getBalance(vars.refundTo).toString(),
-        },
+      console.log('contractBalanceBefore', contractBalanceBefore.toString());
+      console.log('accounts', {
+        tokenContract: context.token.contractInstance.address.toBase58(),
+        htlcContract: context.contractInstance.address.toBase58(),
+        refundTo: vars.refundTo.toBase58(),
       });
-
-      console.log(
-        'balances app',
-        context.zkAppPrivateKey.toPublicKey().toBase58(),
-        context.contractInstance.experimental.token.id.toString(),
-        {
-          token: {
-            mina: Mina.getBalance(
-              context.zkAppPrivateKey.toPublicKey()
-            ).toString(),
-          },
-        }
-      );
-
-      // fund the lock creator account with custom tokens
-      await transferTokenTo(
-        context.token.contractInstance,
-        context.zkAppPrivateKey,
-        context.feePayer,
-        context.token.zkAppPrivateKey,
-        vars.refundTo,
-        vars.amount
-      );
-
-      // this is not required since refundTo is already existing on chain
-      // await fundAddress(context.feePayer, vars.refundTo);
-
-      console.log(
-        'refundTo',
-        context.zkAppPrivateKey.toPublicKey().toBase58(),
-        {
-          token: {
-            mina: Mina.getBalance(vars.refundTo).toString(),
-            [`${context.token.contractInstance.experimental.token.id.toString()}`]:
-              Mina.getBalance(
-                vars.refundTo,
-                context.token.contractInstance.experimental.token.id
-              ).toString(),
-          },
-        }
-      );
-
       await lock(vars);
+      console.log('asserting contract balance');
       const contractBalance = Mina.getBalance(
-        context.zkAppPrivateKey.toPublicKey()
+        context.zkAppPrivateKey.toPublicKey(),
+        context.token.contractInstance.experimental.token.id
       );
       contractBalance.assertEquals(vars.amount);
-      console.log('contract balance', contractBalance.toString());
-      console.log(
-        'refundTo',
-        context.zkAppPrivateKey.toPublicKey().toBase58(),
-        {
-          token: {
-            mina: Mina.getBalance(vars.refundTo).toString(),
-            [`${context.token.contractInstance.experimental.token.id.toString()}`]:
-              Mina.getBalance(
-                vars.refundTo,
-                context.token.contractInstance.experimental.token.id
-              ).toString(),
-          },
-        }
+
+      console.log('asserting refundTo');
+      const refundToBalance = Mina.getBalance(
+        vars.refundTo,
+        context.token.contractInstance.experimental.token.id
       );
-      // const currentHashlock = context.contractInstance.hashlock.get();
-      // currentHashlock.assertEquals(Poseidon.hash(vars.secret.value));
-      // const currentRecipient = context.contractInstance.recipient.get();
-      // currentRecipient.assertEquals(vars.recipient);
+      refundToBalance.assertEquals(UInt64.from(0));
+
+      const currentHashlock = context.contractInstance.hashlock.get();
+      currentHashlock.assertEquals(Poseidon.hash(vars.secret.value));
+      const currentRecipient = context.contractInstance.recipient.get();
+      currentRecipient.assertEquals(vars.recipient);
     });
   });
 
-  // describe('with lock', () => {
-  //   beforeEach(async () => {
-  //     const vars = variables();
-  //     await lock(vars);
-  //   });
+  describe('with lock', () => {
+    beforeEach(async () => {
+      const vars = variables();
+      await lock(vars);
+    });
 
-  //   describe('unlock', () => {
-  //     it('should unlock locked funds', async () => {
-  //       const vars = variables();
+    describe('unlock', () => {
+      it('should unlock locked funds', async () => {
+        const vars = variables();
 
-  //       await fundAddress(context.feePayer, vars.recipient);
+        console.log('accounts', {
+          token: context.token.contractInstance.address.toBase58(),
+          htlc: context.contractInstance.address.toBase58(),
+          recipient: recipientPrivateKey.toPublicKey().toBase58(),
+        });
 
-  //       await unlock(vars.secret);
+        console.log('debug before', {
+          htlc: {
+            balance: Mina.getBalance(
+              context.zkAppPrivateKey.toPublicKey(),
+              context.token.contractInstance.experimental.token.id
+            ).toString(),
+            address: context.contractInstance.address.toBase58(),
+          },
+        });
 
-  //       const recipientBalance = Mina.getBalance(vars.recipient);
-  //       recipientBalance.assertEquals(vars.amount);
+        await unlock(vars);
 
-  //       const contractBalance = Mina.getBalance(
-  //         context.zkAppPrivateKey.toPublicKey()
-  //       );
-  //       contractBalance.assertEquals(UInt64.fromNumber(0));
-  //     });
-  //   });
+        console.log('debug after', {
+          htlc: {
+            tokenId:
+              context.token.contractInstance.experimental.token.id.toString(),
+            balance: Mina.getBalance(
+              context.zkAppPrivateKey.toPublicKey(),
+              context.token.contractInstance.experimental.token.id
+            ).toString(),
+            address: context.contractInstance.address.toBase58(),
+          },
+          recipient: {
+            balance: Mina.getBalance(
+              vars.recipient,
+              context.token.contractInstance.experimental.token.id
+            ).toString(),
+            address: vars.recipient.toBase58(),
+          },
+        });
 
-  //   describe('refund', () => {
-  //     it('should refund locked funds', async () => {
-  //       const vars = variables();
+        const recipientBalance = Mina.getBalance(
+          vars.recipient,
+          context.token.contractInstance.experimental.token.id
+        );
+        console.log('recipientBalance', recipientBalance.toString());
+        recipientBalance.assertEquals(vars.amount);
 
-  //       await fundAddress(context.feePayer, vars.refundTo);
+        const contractBalance = Mina.getBalance(
+          context.zkAppPrivateKey.toPublicKey(),
+          context.token.contractInstance.experimental.token.id
+        );
+        contractBalance.assertEquals(UInt64.from(0));
+      });
+    });
 
-  //       await refund();
+    describe('refund', () => {
+      it('should refund locked funds', async () => {
+        const vars = variables();
 
-  //       const recipientBalance = Mina.getBalance(vars.refundTo);
-  //       recipientBalance.assertEquals(vars.amount);
+        await refund(vars);
 
-  //       const contractBalance = Mina.getBalance(
-  //         context.zkAppPrivateKey.toPublicKey()
-  //       );
-  //       contractBalance.assertEquals(UInt64.fromNumber(0));
-  //     });
-  //   });
-  // });
+        const recipientBalance = Mina.getBalance(
+          vars.refundTo,
+          context.token.contractInstance.experimental.token.id
+        );
+        recipientBalance.assertEquals(vars.amount);
+
+        const contractBalance = Mina.getBalance(
+          context.zkAppPrivateKey.toPublicKey(),
+          context.token.contractInstance.experimental.token.id
+        );
+        contractBalance.assertEquals(UInt64.from(0));
+      });
+    });
+  });
 });

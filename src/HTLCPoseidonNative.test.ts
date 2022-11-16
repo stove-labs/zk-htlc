@@ -18,7 +18,7 @@ export interface TestContext {
   zkAppPrivateKey: PrivateKey;
 }
 
-describe.only('HTLCPoseidonNative', () => {
+describe('HTLCPoseidonNative', () => {
   let context = {} as TestContext;
 
   // beforeAll since the tests are consequtive
@@ -39,7 +39,7 @@ describe.only('HTLCPoseidonNative', () => {
     const hashlock = Poseidon.hash(secret.value);
     const timestamp = Mina.getNetworkState().timestamp;
     const expireAt = addDays(timestamp, 4);
-    const amount = UInt64.fromNumber(300000000);
+    const amount = UInt64.from(300000000);
     const recipient = recipientPrivateKey.toPublicKey();
     const refundTo = refundToPrivateKey.toPublicKey();
     return {
@@ -59,22 +59,21 @@ describe.only('HTLCPoseidonNative', () => {
     await transferTo(context.feePayer, vars.refundTo, vars.amount);
 
     const tx = await Mina.transaction(context.feePayer, () => {
-      // refundTo needs to sign so the contract can transfer funds on its behalf
-      const sendFromRefundToAccountUpdate = context.contractInstance.lock(
+      context.contractInstance.lock(
         vars.refundTo,
         vars.recipient,
         vars.amount,
         vars.hashlock,
         vars.expireAt
       );
-
-      sendFromRefundToAccountUpdate.sign(refundToPrivateKey);
     });
 
+    // refundTo needs to sign so the contract can transfer funds on its behalf
+    tx.sign([refundToPrivateKey]);
+
     await tx.prove();
-    const id = await tx.send();
-    // wait for the tx to make it into a block, since we rely on nonces in subsequent transactions
-    await id.wait();
+    await tx.send();
+
     console.log(
       'after lock',
       context.contractInstance.account.nonce.get().toString()
@@ -117,6 +116,7 @@ describe.only('HTLCPoseidonNative', () => {
       const contractBalance = Mina.getBalance(
         context.zkAppPrivateKey.toPublicKey()
       );
+      console.log('contractBalance', contractBalance.toString());
       contractBalance.assertEquals(vars.amount);
 
       const currentHashlock = context.contractInstance.hashlock.get();
@@ -156,7 +156,7 @@ describe.only('HTLCPoseidonNative', () => {
         const contractBalance = Mina.getBalance(
           context.zkAppPrivateKey.toPublicKey()
         );
-        contractBalance.assertEquals(UInt64.fromNumber(0));
+        contractBalance.assertEquals(UInt64.from(0));
       });
     });
 
@@ -172,7 +172,7 @@ describe.only('HTLCPoseidonNative', () => {
         const contractBalance = Mina.getBalance(
           context.zkAppPrivateKey.toPublicKey()
         );
-        contractBalance.assertEquals(UInt64.fromNumber(0));
+        contractBalance.assertEquals(UInt64.from(0));
       });
     });
   });

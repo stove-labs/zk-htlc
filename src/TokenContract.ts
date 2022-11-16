@@ -14,6 +14,7 @@ import {
   UInt64,
   Circuit,
   Field,
+  VerificationKey,
 } from 'snarkyjs';
 
 /**
@@ -53,22 +54,36 @@ export class TokenContract extends SmartContract {
     this.balance.subInPlace(Mina.accountCreationFee());
   }
 
-  // this is a very standardized deploy method. instead, we could also take the account update from a callback
-  // => need callbacks for signatures
-  @method deployZkapp(address: PublicKey) {
-    let tokenId = this.experimental.token.id;
-    let zkapp = Experimental.createChildAccountUpdate(
-      this.self,
-      address,
-      tokenId
-    );
-    AccountUpdate.setValue(zkapp.update.permissions, {
-      ...Permissions.default(),
-      send: Permissions.proof(),
-    });
-    // TODO pass in verification key --> make it a circuit value --> make circuit values able to hold auxiliary data
-    // AccountUpdate.setValue(zkapp.update.verificationKey, verificationKey);
-    zkapp.sign();
+  // // this is a very standardized deploy method. instead, we could also take the account update from a callback
+  // // => need callbacks for signatures
+  // @method deployZkapp(address: PublicKey) {
+  //   let tokenId = this.experimental.token.id;
+  //   let zkapp = Experimental.createChildAccountUpdate(
+  //     this.self,
+  //     address,
+  //     tokenId
+  //   );
+  //   AccountUpdate.setValue(zkapp.update.permissions, {
+  //     ...Permissions.default(),
+  //     send: Permissions.proof(),
+  //   });
+  //   // TODO pass in verification key --> make it a circuit value --> make circuit values able to hold auxiliary data
+  //   // AccountUpdate.setValue(zkapp.update.verificationKey, verificationKey);
+  //   zkapp.sign();
+  // }
+
+  @method approveZkapp(zkappUpdate: AccountUpdate) {
+    this.experimental.approve(zkappUpdate);
+    // return {} as any;
+    // let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
+    // balanceChange.assertEquals(Int64.from(0));
+  }
+
+  @method approveZkapp2(zkappUpdate: AccountUpdate) {
+    this.experimental.approve(zkappUpdate);
+    // return {} as any;
+    // let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
+    // balanceChange.assertEquals(Int64.from(0));
   }
 
   // // let a zkapp do whatever it wants, as long as the token supply stays constant
@@ -85,7 +100,49 @@ export class TokenContract extends SmartContract {
   //   balance.assertEquals(Int64.zero);
   // }
 
-  @method transfer(from: PublicKey, to: PublicKey, value: UInt64) {
-    this.experimental.token.send({ from, to, amount: value });
+  // TODO: check account update balance changes do not mint any tokens
+  @method approveTransferCallback(callback: Experimental.Callback<any>) {
+    const layout = AccountUpdate.Layout.AnyChildren;
+    console.log('approving');
+    const approvedAccountUpdate = this.experimental.approve(callback, layout);
+    // console.log('approved', approved.body.balanceChange.magnitude.toString());
+    const balanceChange = Int64.fromObject(
+      approvedAccountUpdate.body.balanceChange
+    );
+    balanceChange.assertEquals(Int64.from(0));
+  }
+
+  @method approveUpdateAndSend(
+    zkappUpdate: AccountUpdate,
+    to: PublicKey,
+    amount: UInt64
+  ) {
+    this.experimental.approve(zkappUpdate);
+
+    // see if balance change cancels the amount sent
+    let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
+    balanceChange.assertEquals(Int64.from(amount).neg());
+    // add same amount of tokens to the receiving address
+    console.log('minting', {
+      to: to.toBase58(),
+      amount: amount.toString(),
+    });
+    this.experimental.token.mint({ address: to, amount });
+  }
+
+  @method transfer(
+    from: PublicKey,
+    to: PublicKey,
+    value: UInt64
+  ): AccountUpdate {
+    return this.experimental.token.send({ from, to, amount: value });
+  }
+
+  @method mint(to: PublicKey, value: UInt64) {
+    this.experimental.token.mint({ address: to, amount: value });
+  }
+
+  @method burn(from: PublicKey, value: UInt64) {
+    this.experimental.token.burn({ address: from, amount: value });
   }
 }

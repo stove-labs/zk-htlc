@@ -27,6 +27,7 @@ export const deploy = async (
   concreteContract:
     | typeof HTLCPoseidonNative
     | typeof HTLCPoseidonExperimentalToken,
+  tokenContract?: TokenContract,
   tokenId?: Field
 ) => {
   const zkAppPrivateKey = PrivateKey.random();
@@ -35,21 +36,45 @@ export const deploy = async (
     tokenId
   );
 
+  console.log('zkapp tokenId', {
+    tokenId: tokenId?.toString(),
+    contractInstanceTokenId: contractInstance.tokenId.toString(),
+  });
+
+  Error.stackTraceLimit = 1000;
+  try {
+    // tokenContract && (await concreteContract.compile());
+  } catch (e) {
+    console.error('compile error');
+    console.error(e);
+  }
+
   console.log('deploying with app token', tokenId?.toString());
 
   // forge a deployment transaction
-  const tx = await Mina.transaction(feePayer, () => {
+  const tx = await Mina.transaction(feePayer, async () => {
     // fund the fee payer account
     AccountUpdate.fundNewAccount(feePayer);
     // deploy the contract
     contractInstance.deploy({ zkappKey: zkAppPrivateKey });
     // sign it, since we are not using proofs
     contractInstance.sign(zkAppPrivateKey);
+
+    // token contract approves the deployment account update
+    tokenContract && tokenContract.approveZkapp(contractInstance.self);
   });
 
-  await tx.send();
+  console.log('deploy account updates', tx.transaction.accountUpdates);
 
-  console.log('contract deployed');
+  tx.sign([zkAppPrivateKey]);
+
+  try {
+    await tx.prove();
+    await tx.send();
+  } catch (e) {
+    console.error('deploy + approve error');
+    console.error(e);
+  }
 
   return { contractInstance, zkAppPrivateKey };
 };
@@ -68,7 +93,6 @@ export const fundAddress = async (feePayer: PrivateKey, address: PublicKey) => {
   });
 
   await fundRecipientTx.prove();
-
   await fundRecipientTx.send();
 };
 
@@ -103,7 +127,8 @@ export const transferTokenTo = async (
   feePayer: PrivateKey,
   from: PrivateKey,
   to: PublicKey,
-  amount: UInt64
+  amount: UInt64,
+  fund?: boolean
 ) => {
   console.log('transferToken', {
     zkAppPublicKey: zkAppPrivateKey.toPublicKey().toBase58(),
@@ -111,18 +136,24 @@ export const transferTokenTo = async (
     to: to.toBase58(),
     amount: amount.toString(),
   });
-  const transferToTx = await Mina.transaction(feePayer, () => {
-    // const tokenStorageCreationAccountUpdate =
-    //   AccountUpdate.createSigned(feePayer);
-    // tokenStorageCreationAccountUpdate.balance.subInPlace(
-    //   Mina.accountCreationFee()
-    // );
+
+  // send mina to the token contract, so that the token contract can pay for the creation fee
+  if (fund) {
+    await transferTo(feePayer, from.toPublicKey(), Mina.accountCreationFee());
+  }
+
+  let transferToTx = await Mina.transaction(feePayer, () => {
+    if (fund) {
+      const fromAccountUpdate = AccountUpdate.createSigned(from);
+      fromAccountUpdate.balance.subInPlace(Mina.accountCreationFee());
+    }
 
     contractInstance.transfer(from.toPublicKey(), to, amount);
-    // contractInstance.sign(zkAppPrivateKey);
   });
 
-  transferToTx.sign([from]);
+  // IMPORTANT!! .sign returns a new transaction, so we need to .send/.prove the new one
+  transferToTx = transferToTx.sign([from]);
+  await transferToTx.prove();
 
   await transferToTx.send();
   console.log('transferTokenTo successful');
@@ -145,8 +176,6 @@ export const deployToken = async (feePayer: PrivateKey) => {
     contractInstance.sign(zkAppPrivateKey);
   });
 
-  // await deployTx.prove();
-
   await deployTx.send();
 
   /**
@@ -167,12 +196,6 @@ export const deployToken = async (feePayer: PrivateKey) => {
     // sign it, since we are not using proofs
     contractInstance.sign(zkAppPrivateKey);
   });
-
-  // initTx.sign([])
-
-  // await initTx.prove();
-
-  // console.log('tx', initTx.toPretty());
 
   await initTx.send();
 

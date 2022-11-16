@@ -33,11 +33,17 @@ export class Secret extends CircuitValue {
   }
 }
 
+export type ExternalCallback = () => AccountUpdate;
+export type OptionalExternalCallback = void | ExternalCallback;
+
 export interface HTLCPoseidonConcrete {
   // eslint-disable-next-line
-  depositIntoSelf(from: PublicKey, amount: UInt64): AccountUpdate;
+  depositIntoSelf(from: PublicKey, amount: UInt64): OptionalExternalCallback;
   // eslint-disable-next-line
-  withdrawFromSelfTo(address: PublicKey): void;
+  withdrawFromSelfTo(address: PublicKey): OptionalExternalCallback;
+
+  // TODO: add top level non-method functions that wrap callback approvals for experimental token implementations.
+  // e.g. non-@method lock() calling @method _lock() or something similar, adding a callback approval where necessary.
 }
 
 /**
@@ -149,8 +155,12 @@ export abstract class HTLCPoseidon
     currentHashlock.assertEquals(expectedHashlock);
   }
 
+  abstract depositIntoSelf(
   // eslint-disable-next-line
-  abstract depositIntoSelf(from: PublicKey, amount: UInt64): AccountUpdate;
+    from: PublicKey,
+    // eslint-disable-next-line
+    amount: UInt64
+  ): OptionalExternalCallback;
 
   @method
   lock(
@@ -159,7 +169,9 @@ export abstract class HTLCPoseidon
     amount: UInt64,
     hashlock: Field,
     expireAt: UInt64
-  ): AccountUpdate {
+  ): void {
+    // console.log('tokenId');
+    // Circuit.log(this.tokenId);
     // verify preconditions
     this.assertIsNew();
     this.assertExpiresAtSufficientFuture(expireAt);
@@ -169,14 +181,14 @@ export abstract class HTLCPoseidon
     this.setRecipient(recipient);
     this.setHashLock(hashlock);
     // transfer from someone to the contract
-    return this.depositIntoSelf(refundTo, amount);
+    this.depositIntoSelf(refundTo, amount);
   }
 
   // eslint-disable-next-line
-  abstract withdrawFromSelfTo(address: PublicKey): void;
+  abstract withdrawFromSelfTo(address: PublicKey): OptionalExternalCallback;
 
   @method
-  unlock(secret: Secret) {
+  unlock(secret: Secret): void {
     // verify preconditions
     // TODO: actually check the state, not just the nonce
     this.assertIsNotNew();
@@ -185,6 +197,13 @@ export abstract class HTLCPoseidon
     this.setSecret(secret);
 
     const recipient = this.getRecipient();
+    // TODO: implement a check for signature of the recipient, disallowing call of 'unlock' without 'being' the recipient
+    // const accountUpdateRecipient = AccountUpdate.create(
+    //   recipient,
+    //   this.tokenId
+    // );
+    // accountUpdateRecipient.sign();
+
     // transfer from the contract to the recipient
     this.withdrawFromSelfTo(recipient);
   }
@@ -206,7 +225,7 @@ export abstract class HTLCPoseidon
       // TODO: allow only proofs in production
       // for testing purposes, allow tx signed with the app's private key to update state
       editState: Permissions.proofOrSignature(),
-      send: Permissions.proofOrSignature(),
+      send: Permissions.proof(),
     });
   }
 }
