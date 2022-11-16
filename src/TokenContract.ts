@@ -41,10 +41,10 @@ export class TokenContract extends SmartContract {
       send: Permissions.proofOrSignature(),
     });
   }
-  @method init() {
+  @method initSupply() {
     // mint the entire supply to the token account with the same address as this contract
     let address = this.self.body.publicKey;
-    let receiver = this.experimental.token.mint({
+    let receiver = this.token.mint({
       address,
       amount: this.SUPPLY,
     });
@@ -57,7 +57,7 @@ export class TokenContract extends SmartContract {
   // // this is a very standardized deploy method. instead, we could also take the account update from a callback
   // // => need callbacks for signatures
   // @method deployZkapp(address: PublicKey) {
-  //   let tokenId = this.experimental.token.id;
+  //   let tokenId = this.token.id;
   //   let zkapp = Experimental.createChildAccountUpdate(
   //     this.self,
   //     address,
@@ -73,14 +73,14 @@ export class TokenContract extends SmartContract {
   // }
 
   @method approveZkapp(zkappUpdate: AccountUpdate) {
-    this.experimental.approve(zkappUpdate);
+    this.approve(zkappUpdate);
     // return {} as any;
     // let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
     // balanceChange.assertEquals(Int64.from(0));
   }
 
   @method approveZkapp2(zkappUpdate: AccountUpdate) {
-    this.experimental.approve(zkappUpdate);
+    this.approve(zkappUpdate);
     // return {} as any;
     // let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
     // balanceChange.assertEquals(Int64.from(0));
@@ -96,7 +96,7 @@ export class TokenContract extends SmartContract {
   //     callback
   //   );
   //   // walk account updates to see if balances for this token cancel
-  //   let balance = balanceSum(zkappUpdate, this.experimental.token.id);
+  //   let balance = balanceSum(zkappUpdate, this.token.id);
   //   balance.assertEquals(Int64.zero);
   // }
 
@@ -104,7 +104,7 @@ export class TokenContract extends SmartContract {
   @method approveTransferCallback(callback: Experimental.Callback<any>) {
     const layout = AccountUpdate.Layout.AnyChildren;
     console.log('approving');
-    const approvedAccountUpdate = this.experimental.approve(callback, layout);
+    const approvedAccountUpdate = this.approve(callback, layout);
     // console.log('approved', approved.body.balanceChange.magnitude.toString());
     const balanceChange = Int64.fromObject(
       approvedAccountUpdate.body.balanceChange
@@ -117,7 +117,7 @@ export class TokenContract extends SmartContract {
     to: PublicKey,
     amount: UInt64
   ) {
-    this.experimental.approve(zkappUpdate);
+    this.approve(zkappUpdate);
 
     // see if balance change cancels the amount sent
     let balanceChange = Int64.fromObject(zkappUpdate.body.balanceChange);
@@ -127,7 +127,7 @@ export class TokenContract extends SmartContract {
       to: to.toBase58(),
       amount: amount.toString(),
     });
-    this.experimental.token.mint({ address: to, amount });
+    this.token.mint({ address: to, amount });
   }
 
   @method transfer(
@@ -135,14 +135,14 @@ export class TokenContract extends SmartContract {
     to: PublicKey,
     value: UInt64
   ): AccountUpdate {
-    return this.experimental.token.send({ from, to, amount: value });
+    return this.token.send({ from, to, amount: value });
   }
 
   @method mint(to: PublicKey, value: UInt64) {
-    this.experimental.token.mint({ address: to, amount: value });
+    this.token.mint({ address: to, amount: value });
   }
 
   @method burn(from: PublicKey, value: UInt64) {
-    this.experimental.token.burn({ address: from, amount: value });
+    this.token.burn({ address: from, amount: value });
   }
 }

@@ -68,7 +68,7 @@ describe('HTLCPoseidonExperimentalToken', () => {
         context.feePayer,
         HTLCPoseidonExperimentalToken,
         context.token.contractInstance,
-        context.token.contractInstance.experimental.token.id
+        context.token.contractInstance.token.id
       )),
     };
 
@@ -192,7 +192,7 @@ describe('HTLCPoseidonExperimentalToken', () => {
 
       const contractBalanceBefore = Mina.getBalance(
         context.zkAppPrivateKey.toPublicKey(),
-        context.token.contractInstance.experimental.token.id
+        context.token.contractInstance.token.id
       );
       console.log('contractBalanceBefore', contractBalanceBefore.toString());
       console.log('accounts', {
@@ -204,14 +204,14 @@ describe('HTLCPoseidonExperimentalToken', () => {
       console.log('asserting contract balance');
       const contractBalance = Mina.getBalance(
         context.zkAppPrivateKey.toPublicKey(),
-        context.token.contractInstance.experimental.token.id
+        context.token.contractInstance.token.id
       );
       contractBalance.assertEquals(vars.amount);
 
       console.log('asserting refundTo');
       const refundToBalance = Mina.getBalance(
         vars.refundTo,
-        context.token.contractInstance.experimental.token.id
+        context.token.contractInstance.token.id
       );
       refundToBalance.assertEquals(UInt64.from(0));
 
@@ -242,7 +242,7 @@ describe('HTLCPoseidonExperimentalToken', () => {
           htlc: {
             balance: Mina.getBalance(
               context.zkAppPrivateKey.toPublicKey(),
-              context.token.contractInstance.experimental.token.id
+              context.token.contractInstance.token.id
             ).toString(),
             address: context.contractInstance.address.toBase58(),
           },
@@ -252,18 +252,17 @@ describe('HTLCPoseidonExperimentalToken', () => {
 
         console.log('debug after', {
           htlc: {
-            tokenId:
-              context.token.contractInstance.experimental.token.id.toString(),
+            tokenId: context.token.contractInstance.token.id.toString(),
             balance: Mina.getBalance(
               context.zkAppPrivateKey.toPublicKey(),
-              context.token.contractInstance.experimental.token.id
+              context.token.contractInstance.token.id
             ).toString(),
             address: context.contractInstance.address.toBase58(),
           },
           recipient: {
             balance: Mina.getBalance(
               vars.recipient,
-              context.token.contractInstance.experimental.token.id
+              context.token.contractInstance.token.id
             ).toString(),
             address: vars.recipient.toBase58(),
           },
@@ -271,14 +270,14 @@ describe('HTLCPoseidonExperimentalToken', () => {
 
         const recipientBalance = Mina.getBalance(
           vars.recipient,
-          context.token.contractInstance.experimental.token.id
+          context.token.contractInstance.token.id
         );
         console.log('recipientBalance', recipientBalance.toString());
         recipientBalance.assertEquals(vars.amount);
 
         const contractBalance = Mina.getBalance(
           context.zkAppPrivateKey.toPublicKey(),
-          context.token.contractInstance.experimental.token.id
+          context.token.contractInstance.token.id
         );
         contractBalance.assertEquals(UInt64.from(0));
       });
@@ -292,13 +291,13 @@ describe('HTLCPoseidonExperimentalToken', () => {
 
         const recipientBalance = Mina.getBalance(
           vars.refundTo,
-          context.token.contractInstance.experimental.token.id
+          context.token.contractInstance.token.id
         );
         recipientBalance.assertEquals(vars.amount);
 
         const contractBalance = Mina.getBalance(
           context.zkAppPrivateKey.toPublicKey(),
-          context.token.contractInstance.experimental.token.id
+          context.token.contractInstance.token.id
         );
         contractBalance.assertEquals(UInt64.from(0));
       });

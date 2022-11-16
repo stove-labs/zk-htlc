@@ -163,6 +163,8 @@ export const deployToken = async (feePayer: PrivateKey) => {
   const zkAppPrivateKey = PrivateKey.random();
   const contractInstance = new TokenContract(zkAppPrivateKey.toPublicKey());
 
+  Error.stackTraceLimit = 10000;
+
   console.log('accountCreationFee', Mina.accountCreationFee().toString());
 
   console.log('deploy token');
@@ -172,10 +174,14 @@ export const deployToken = async (feePayer: PrivateKey) => {
     AccountUpdate.fundNewAccount(feePayer);
     // deploy the contract
     contractInstance.deploy({ zkappKey: zkAppPrivateKey });
-    // sign it, since we are not using proofs
-    contractInstance.sign(zkAppPrivateKey);
+    // // sign it, since we are not using proofs
+    // contractInstance.sign(zkAppPrivateKey);
+    contractInstance.requireSignature();
   });
 
+  deployTx.sign([zkAppPrivateKey]);
+
+  await deployTx.prove();
   await deployTx.send();
 
   /**
@@ -192,11 +198,10 @@ export const deployToken = async (feePayer: PrivateKey) => {
   console.log('init token');
   const initTx = await Mina.transaction(feePayer, () => {
     // init the contract
-    contractInstance.init();
-    // sign it, since we are not using proofs
-    contractInstance.sign(zkAppPrivateKey);
+    contractInstance.initSupply();
   });
 
+  await initTx.prove();
   await initTx.send();
 
   console.log(
@@ -205,9 +210,9 @@ export const deployToken = async (feePayer: PrivateKey) => {
     {
       token: {
         mina: Mina.getBalance(zkAppPrivateKey.toPublicKey()).toString(),
-        [`${contractInstance.experimental.token.id}`]: Mina.getBalance(
+        [`${contractInstance.token.id}`]: Mina.getBalance(
           zkAppPrivateKey.toPublicKey(),
-          contractInstance.experimental.token.id
+          contractInstance.token.id
         ).toString(),
       },
     }
