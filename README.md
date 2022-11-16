@@ -27,13 +27,13 @@ It supports both the native MINA token, and (previously experimental) protocol b
 
 **🔓 Unlocking locked assets/tokens**
 
-1. Alice calls Bob's `HTLCPoseidonExperimentalToken.unlock()`, providing the secret used to generate the hashlock used to deploy both of their contracts. This reveals the secret to Bob and transfers the funds from the contract to Alice.
-2. Bob calls Alice's `HTLCPoseidonNative.unlock()`, using the secret he obtained from Alice. This transfers the funds from the contract to Bob
+1. Alice calls Bob's `HTLCPoseidonExperimentalToken.unlock()`, providing the secret used to generate the hashlock used to deploy both of their contracts. This reveals the secret to Bob automatically and transfers the funds (10 TOKEN) from the contract to Alice. The secret is stored on-chain within the contract.
+2. Bob calls Alice's `HTLCPoseidonNative.unlock()`, using the secret he obtained from Alice. This transfers the funds (10 MINA) from the contract to Bob.
 3. Done!
 
 **📆 Edge cases**
 
-For a case when one of the participants fails to unlock the locked tokens, the creator of the contract can refund the locked tokens using the `.refund()` method.
+For a case when one of the participants fails to unlock the locked tokens in a given timelock period, the creator of each contract can refund their locked tokens using the `.refund()` method.
 
 ## Credits
 
