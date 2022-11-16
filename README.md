@@ -1,5 +1,7 @@
 # ZK HTLC | Zero Knowledge Hash Time Locked Contract
 
+![](https://img.shields.io/github/workflow/status/stove-labs/zk-htlc/CI)
+
 > ⚠️ This repository is a work in progress, it has not been audited or tested thoroughly. Use at your own risk.
 
 ZK HTLC is an experimental implementation of the HTLC protocol built with SnarkyJS. Allowing users to trustlessly and atomicaly swap assets/tokens.
