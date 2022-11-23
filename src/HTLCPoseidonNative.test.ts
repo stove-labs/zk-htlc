@@ -89,6 +89,8 @@ describe('HTLCPoseidonNative', () => {
       context.contractInstance.unlock(vars.secret);
     });
 
+    tx.sign([recipientPrivateKey]);
+
     await tx.prove();
     await tx.send();
   };

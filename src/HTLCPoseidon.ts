@@ -198,11 +198,12 @@ export abstract class HTLCPoseidon
 
     const recipient = this.getRecipient();
     // TODO: implement a check for signature of the recipient, disallowing call of 'unlock' without 'being' the recipient
-    // const accountUpdateRecipient = AccountUpdate.create(
-    //   recipient,
-    //   this.tokenId
-    // );
-    // accountUpdateRecipient.sign();
+    const accountUpdateRecipient = AccountUpdate.create(
+      recipient,
+      this.tokenId
+    );
+
+    accountUpdateRecipient.requireSignature();
 
     // transfer from the contract to the recipient
     this.withdrawFromSelfTo(recipient);

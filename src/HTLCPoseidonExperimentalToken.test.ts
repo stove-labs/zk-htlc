@@ -141,7 +141,6 @@ describe('HTLCPoseidonExperimentalToken', () => {
       true // fund
     );
 
-    console.log('unlocking');
     const tx = await Mina.transaction(context.feePayer, () => {
       context.contractInstance.unlock(vars.secret);
       context.token.contractInstance.approveUpdateAndSend(
